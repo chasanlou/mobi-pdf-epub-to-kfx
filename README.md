@@ -11,6 +11,13 @@
 
 程序会按顺序完成图片提取、KCC 转 CBZ、kckfxgen 转 KFX，并在最终 KFX 成功生成后清理中间图片目录和 CBZ 文件。直接拖入的原始图片文件夹会被保留。
 
+## 重要提醒
+
+- 使用前需要先安装 Kindle Comic Converter，并按照 KCC 官方说明安装 zip 依赖，否则 KCC 转 CBZ 时可能会失败。
+- KCC 项目地址：[ciromattia/kcc](https://github.com/ciromattia/kcc)
+- KCC 下载地址：[KCC Releases](https://github.com/ciromattia/kcc/releases)
+- KCC 的 Output Folder 必须设置成和本程序里的 CBZ 漫画放置点一致，否则程序会等不到 CBZ 文件并报错。
+
 ## 功能
 
 - 淡色系 PySide6 图形界面
@@ -35,6 +42,23 @@
 - Python 3.10
 - Python 包：`PySide6`、`mobi`、`PyMuPDF`
 
+
+## KCC 推荐设置
+
+推荐按下面的方向设置 KCC：
+
+- 设备选择 Kindle Paperwhite 12
+- 输出格式选择 CBZ
+- 勾选 Output Folder，并把输出路径设置为本程序的 CBZ 漫画放置点
+- 勾选 Right-to-left (manga)
+- 勾选 Stretch/Upscale
+- 勾选 Custom gamma
+- 勾选 Cropping mode
+- 勾选 Spread shift
+- 勾选 Smart Cover Crop
+- Gamma 设置为 1.40
+- Cropping Power 设置为 1.00
+- Preserve Margin % 设置为 0
 
 ## 默认路径
 
