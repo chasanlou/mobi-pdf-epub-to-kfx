@@ -35,7 +35,6 @@
 - Python 3.10
 - Python 包：`PySide6`、`mobi`、`PyMuPDF`
 
-当前工程主要面向作者本机环境，其他电脑使用前需要在设置页里修改路径。
 
 ## 默认路径
 
@@ -55,7 +54,7 @@ E:\Maga_Output\cbz
 D:\漫画
 ```
 
-`ui_settings.json` 是本机个人配置文件，已经被 `.gitignore` 忽略。仓库里提供了 `ui_settings.example.json` 作为示例。
+
 
 ## 开发运行
 
@@ -85,7 +84,7 @@ python -m PyInstaller --noconfirm --clean --windowed --name MobiKfxStudio --add-
 dist\MobiKfxStudio\MobiKfxStudio.exe
 ```
 
-建议不要把 `dist/` 和 `build/` 直接提交到 GitHub。如需发布 exe，使用 GitHub Releases 上传。
+
 
 ## 注意
 
