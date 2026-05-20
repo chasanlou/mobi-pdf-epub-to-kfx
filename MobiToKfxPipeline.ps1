@@ -16,8 +16,8 @@ $KccOutputRoot = Join-Path $MobitoolOutputRoot 'cbz'
 $KfxGuiExe = 'E:\kfx\kckfxgen-gui.exe'
 $KfxCliScript = 'E:\kckfxgen_cli_runtime\run_kckfxgen_cli.py'
 $KfxCliRuntime = 'E:\kckfxgen_cli_runtime'
-$KfxPythonExe = 'C:\Users\cong\AppData\Local\Programs\Python\Python310\python.exe'
-$ExtractPythonExe = $KfxPythonExe
+$KfxPythonPath = ''
+$ExtractPythonPath = ''
 $KfxOutputRoot = 'D:\漫画'
 $LogFile = Join-Path $PSScriptRoot '转换日志.txt'
 $MobiExtractScript = Join-Path $PSScriptRoot 'extract_mobi_images.py'
@@ -37,8 +37,8 @@ function Apply-Config {
     if ($cfg.image_output_dir) { $script:MobitoolOutputRoot = [string]$cfg.image_output_dir }
     if ($cfg.cbz_output_dir) { $script:KccOutputRoot = [string]$cfg.cbz_output_dir }
     if ($cfg.kfx_output_dir) { $script:KfxOutputRoot = [string]$cfg.kfx_output_dir }
-    if ($cfg.kfx_python_path) { $script:KfxPythonExe = [string]$cfg.kfx_python_path }
-    if ($cfg.extract_python_path) { $script:ExtractPythonExe = [string]$cfg.extract_python_path }
+    if ($cfg.kfx_python_path) { $script:KfxPythonPath = [string]$cfg.kfx_python_path }
+    if ($cfg.extract_python_path) { $script:ExtractPythonPath = [string]$cfg.extract_python_path }
     if (-not $cfg.cbz_output_dir -and $cfg.image_output_dir) {
         $script:KccOutputRoot = Join-Path $script:MobitoolOutputRoot 'cbz'
     }
@@ -260,8 +260,22 @@ function Run-BookImageExtract {
     Write-Log "开始图片提取：$BookPath"
     Push-Location $PSScriptRoot
     try {
-        $extractOutput = & $ExtractPythonExe $MobiExtractScript $BookPath $targetFolder 2>&1
-        $extractExitCode = $LASTEXITCODE
+        $extractResult = Invoke-NativeProcessCaptured `
+            -FilePath $script:ExtractPython.FilePath `
+            -Arguments (@($script:ExtractPython.PrefixArgs) + @($MobiExtractScript, $BookPath, $targetFolder)) `
+            -WorkingDirectory $PSScriptRoot `
+            -Environment @{
+                PYTHONUTF8 = '1'
+                PYTHONIOENCODING = 'utf-8'
+            }
+        $extractOutput = @()
+        if ($extractResult.StdOut) {
+            $extractOutput += ($extractResult.StdOut -split "`r?`n")
+        }
+        if ($extractResult.StdErr) {
+            $extractOutput += ($extractResult.StdErr -split "`r?`n")
+        }
+        $extractExitCode = $extractResult.ExitCode
     } finally {
         Pop-Location
     }
@@ -424,6 +438,84 @@ function Invoke-NativeProcessCaptured {
     }
 }
 
+function Join-CommandForLog {
+    param([object]$Command)
+    return (@($Command.FilePath) + @($Command.PrefixArgs)) -join ' '
+}
+
+function Test-PythonCommand {
+    param(
+        [string]$FilePath,
+        [string[]]$PrefixArgs = @(),
+        [switch]$RequirePython310,
+        [string[]]$RequiredModules = @()
+    )
+    try {
+        $moduleCheck = ''
+        foreach ($module in $RequiredModules) {
+            $moduleCheck += "import $module; "
+        }
+        $code = $moduleCheck + "import sys; print(sys.version_info.major); print(sys.version_info.minor)"
+        $result = Invoke-NativeProcessCaptured `
+            -FilePath $FilePath `
+            -Arguments (@($PrefixArgs) + @('-c', $code)) `
+            -WorkingDirectory $PSScriptRoot `
+            -Environment @{
+                PYTHONUTF8 = '1'
+                PYTHONIOENCODING = 'utf-8'
+            }
+        if ($result.ExitCode -ne 0) { return $false }
+        $lines = @($result.StdOut -split "`r?`n" | Where-Object { $_ -ne '' })
+        if ($RequirePython310) {
+            return ($lines.Count -ge 2 -and $lines[0] -eq '3' -and $lines[1] -eq '10')
+        }
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Resolve-PythonCommand {
+    param(
+        [string]$ConfiguredPath,
+        [string]$Purpose,
+        [switch]$RequirePython310,
+        [string[]]$RequiredModules = @()
+    )
+
+    $candidates = New-Object System.Collections.Generic.List[object]
+    if ($ConfiguredPath) {
+        $candidates.Add([pscustomobject]@{ FilePath = $ConfiguredPath; PrefixArgs = @(); Label = '设置路径' })
+    }
+    $candidates.Add([pscustomobject]@{ FilePath = 'py'; PrefixArgs = @('-3.10'); Label = 'py -3.10' })
+
+    $commonPaths = @()
+    if ($env:LOCALAPPDATA) { $commonPaths += (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python310\python.exe') }
+    if ($env:ProgramFiles) { $commonPaths += (Join-Path $env:ProgramFiles 'Python310\python.exe') }
+    if (${env:ProgramFiles(x86)}) { $commonPaths += (Join-Path ${env:ProgramFiles(x86)} 'Python310\python.exe') }
+    foreach ($path in $commonPaths) {
+        if ($path -and (Test-Path -LiteralPath $path)) {
+            $candidates.Add([pscustomobject]@{ FilePath = $path; PrefixArgs = @(); Label = '常见安装路径' })
+        }
+    }
+
+    $pathPythons = @(Get-Command python -ErrorAction SilentlyContinue | ForEach-Object { $_.Source } | Select-Object -Unique)
+    foreach ($path in $pathPythons) {
+        $candidates.Add([pscustomobject]@{ FilePath = $path; PrefixArgs = @(); Label = 'PATH' })
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-PythonCommand -FilePath $candidate.FilePath -PrefixArgs $candidate.PrefixArgs -RequirePython310:$RequirePython310 -RequiredModules $RequiredModules) {
+            Write-Log "$Purpose 使用 Python：$(Join-CommandForLog $candidate) [$($candidate.Label)]"
+            return $candidate
+        }
+    }
+
+    $need = if ($RequirePython310) { 'Python 3.10' } else { '可用 Python' }
+    $modules = if ($RequiredModules.Count -gt 0) { '，并安装模块：' + ($RequiredModules -join ', ') } else { '' }
+    throw "$Purpose 找不到$need$modules。请安装 Python 3.10，或在 ui_settings.json 中设置 kfx_python_path / extract_python_path。"
+}
+
 function Run-KfxGen {
     param([string]$CbzPath, [string]$BaseName)
     $kfxPath = Join-Path $KfxOutputRoot ($BaseName + '.kfx')
@@ -460,8 +552,8 @@ function Run-KfxGen {
             $kfxArgs += $CbzPath
             Write-Log "kckfxgen 参数：$($kfxArgs -join ' | ')"
             $kfxResult = Invoke-NativeProcessCaptured `
-                -FilePath $KfxPythonExe `
-                -Arguments $kfxArgs `
+                -FilePath $script:KfxPython.FilePath `
+                -Arguments (@($script:KfxPython.PrefixArgs) + $kfxArgs) `
                 -WorkingDirectory $KfxCliRuntime `
                 -Environment @{
                     PYTHONPATH = $KfxCliRuntime
@@ -542,8 +634,8 @@ function Run-KfxGenBatch {
         $kfxArgs += $item.CbzPath
         Write-Log "kckfxgen 参数 [$index/$($Items.Count)]：$($kfxArgs -join ' | ')"
         $kfxResult = Invoke-NativeProcessCaptured `
-            -FilePath $KfxPythonExe `
-            -Arguments $kfxArgs `
+            -FilePath $script:KfxPython.FilePath `
+            -Arguments (@($script:KfxPython.PrefixArgs) + $kfxArgs) `
             -WorkingDirectory $KfxCliRuntime `
             -Environment @{
                 PYTHONPATH = "$KfxCliRuntime;$PSScriptRoot"
@@ -638,13 +730,19 @@ Ensure-Directory $MobitoolOutputRoot '图片提取输出目录'
 Ensure-Directory $KccOutputRoot 'CBZ 输出目录'
 Ensure-Directory $KfxOutputRoot 'KFX 输出目录'
 Assert-Path $MobiExtractScript '图片提取脚本'
-Assert-Path $ExtractPythonExe '图片提取 Python 3.10'
 Assert-Path $KccExe 'KCC'
 Assert-Path $KfxGuiExe 'kckfxgen'
 Assert-Path $KfxCliScript 'kckfxgen CLI'
 Assert-Path $KfxCliRuntime 'kckfxgen CLI runtime'
-Assert-Path $KfxPythonExe 'kckfxgen Python 3.10'
 Assert-Path $BatchKfxScript 'kckfxgen 批量包装脚本'
+if ($KfxPythonPath -and -not (Test-Path -LiteralPath $KfxPythonPath)) {
+    throw "设置里的 kfx_python_path 不存在：$KfxPythonPath"
+}
+if ($ExtractPythonPath -and -not (Test-Path -LiteralPath $ExtractPythonPath)) {
+    throw "设置里的 extract_python_path 不存在：$ExtractPythonPath"
+}
+$script:ExtractPython = Resolve-PythonCommand -ConfiguredPath $ExtractPythonPath -Purpose '图片提取' -RequiredModules @('mobi', 'fitz')
+$script:KfxPython = Resolve-PythonCommand -ConfiguredPath $KfxPythonPath -Purpose 'kckfxgen' -RequirePython310
 
 if (-not $InputFiles -or $InputFiles.Count -eq 0) {
     $InputFiles = Select-InputFilesWithWindow

@@ -45,6 +45,8 @@ DEFAULT_SETTINGS = {
     "image_output_dir": r"E:\Maga_Output",
     "cbz_output_dir": r"E:\Maga_Output\cbz",
     "kfx_output_dir": r"D:\漫画",
+    "extract_python_path": "",
+    "kfx_python_path": "",
 }
 
 
@@ -493,6 +495,8 @@ class MainWindow(QMainWindow):
         self.image_output_edit = self._add_path_row(layout, "漫画图片提取文件夹 (Output)", "image_output_dir", False)
         self.cbz_output_edit = self._add_path_row(layout, "CBZ 漫画放置点", "cbz_output_dir", False)
         self.kfx_output_edit = self._add_path_row(layout, "最终 KFX 输出目录", "kfx_output_dir", False)
+        self.extract_python_edit = self._add_path_row(layout, "图片提取 Python (可选)", "extract_python_path", True)
+        self.kfx_python_edit = self._add_path_row(layout, "KFX Python 3.10 (可选)", "kfx_python_path", True)
 
         btns = QHBoxLayout()
         self.save_paths_btn = QPushButton("保存设置")
@@ -663,6 +667,8 @@ class MainWindow(QMainWindow):
                     "image_output_dir": self.image_output_edit.text().strip(),
                     "cbz_output_dir": self.cbz_output_edit.text().strip(),
                     "kfx_output_dir": self.kfx_output_edit.text().strip(),
+                    "extract_python_path": self.extract_python_edit.text().strip(),
+                    "kfx_python_path": self.kfx_python_edit.text().strip(),
                 })
             self.settings["theme"] = self.current_theme
             CONFIG_FILE.write_text(json.dumps(self.settings, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -681,12 +687,14 @@ class MainWindow(QMainWindow):
         self.image_output_edit.setText(DEFAULT_SETTINGS["image_output_dir"])
         self.cbz_output_edit.setText(DEFAULT_SETTINGS["cbz_output_dir"])
         self.kfx_output_edit.setText(DEFAULT_SETTINGS["kfx_output_dir"])
+        self.extract_python_edit.setText(DEFAULT_SETTINGS["extract_python_path"])
+        self.kfx_python_edit.setText(DEFAULT_SETTINGS["kfx_python_path"])
         self.save_settings_from_fields()
 
     def browse_path(self, edit, is_file, key):
         start = edit.text().strip() or str(Path.home())
         if is_file:
-            path, _ = QFileDialog.getOpenFileName(self, "选择 KCC 程序", start, "程序 (*.exe);;所有文件 (*.*)")
+            path, _ = QFileDialog.getOpenFileName(self, "选择程序", start, "程序 (*.exe);;所有文件 (*.*)")
         else:
             path = QFileDialog.getExistingDirectory(self, "选择文件夹", start)
         if path:

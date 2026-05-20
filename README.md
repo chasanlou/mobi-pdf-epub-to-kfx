@@ -17,6 +17,7 @@
 - KCC 项目地址：[ciromattia/kcc](https://github.com/ciromattia/kcc)
 - KCC 下载地址：[KCC Releases](https://github.com/ciromattia/kcc/releases)
 - KCC 的 Output Folder 必须设置成和本程序里的 CBZ 漫画放置点一致，否则程序会等不到 CBZ 文件并报错。
+- 程序不会使用作者电脑上的固定 Python 路径；默认会自动寻找 `py -3.10`、常见 Python 3.10 安装路径和 PATH。找不到时可以在设置页手动选择 Python。
 
 ## 功能
 

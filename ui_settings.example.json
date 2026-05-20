@@ -3,5 +3,7 @@
   "kcc_path": "C:\\Kindle Previewer 3\\lib\\fc\\bin\\KCC_10.1.3.exe",
   "image_output_dir": "E:\\Maga_Output",
   "cbz_output_dir": "E:\\Maga_Output\\cbz",
-  "kfx_output_dir": "D:\\漫画"
+  "kfx_output_dir": "D:\\漫画",
+  "extract_python_path": "",
+  "kfx_python_path": ""
 }
