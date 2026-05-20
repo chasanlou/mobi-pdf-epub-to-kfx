@@ -1,11 +1,44 @@
 import glob
+import multiprocessing
 import os
 import shutil
 import sys
 import zipfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+PDF_RENDER_SCALE = float(os.environ.get("MOBIKFX_PDF_SCALE", "2"))
+PDF_MAX_WORKERS = int(os.environ.get("MOBIKFX_PDF_WORKERS", "0") or "0")
+
+_PDF_DOC = None
+_PDF_PATH = None
+_PDF_OUTPUT_DIR = None
+_PDF_SCALE = 2.0
+
+
+def _pdf_worker_init(pdf_path, output_dir, scale):
+    global _PDF_DOC, _PDF_PATH, _PDF_OUTPUT_DIR, _PDF_SCALE
+    import fitz
+
+    _PDF_PATH = pdf_path
+    _PDF_OUTPUT_DIR = output_dir
+    _PDF_SCALE = scale
+    _PDF_DOC = fitz.open(pdf_path)
+
+
+def _render_pdf_page(page_index):
+    import fitz
+
+    doc = _PDF_DOC
+    if doc is None:
+        doc = fitz.open(_PDF_PATH)
+    page = doc.load_page(page_index)
+    matrix = fitz.Matrix(_PDF_SCALE, _PDF_SCALE)
+    pix = page.get_pixmap(matrix=matrix, alpha=False, annots=False)
+    output_path = os.path.join(_PDF_OUTPUT_DIR, f"page_{page_index + 1:04d}.png")
+    pix.save(output_path)
+    return output_path
 
 
 def extract_single_mobi(mobi_path, output_dir):
@@ -83,14 +116,37 @@ def extract_single_pdf(pdf_path, output_dir):
     reset_output_dir(output_dir)
     doc = fitz.open(pdf_path)
     try:
-        if doc.page_count == 0:
+        page_count = doc.page_count
+        if page_count == 0:
             raise RuntimeError("PDF has no pages.")
-        for index, page in enumerate(doc, 1):
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-            pix.save(os.path.join(output_dir, f"page_{index:04d}.png"))
-        return doc.page_count
     finally:
         doc.close()
+
+    cpu_count = os.cpu_count() or 1
+    workers = PDF_MAX_WORKERS or max(1, min(cpu_count - 1 if cpu_count > 1 else 1, 4))
+    workers = max(1, min(workers, page_count))
+
+    if workers == 1 or page_count < 4:
+        _pdf_worker_init(pdf_path, output_dir, PDF_RENDER_SCALE)
+        try:
+            for page_index in range(page_count):
+                _render_pdf_page(page_index)
+        finally:
+            if _PDF_DOC is not None:
+                _PDF_DOC.close()
+        return page_count
+
+    context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        mp_context=context,
+        initializer=_pdf_worker_init,
+        initargs=(pdf_path, output_dir, PDF_RENDER_SCALE),
+    ) as executor:
+        futures = [executor.submit(_render_pdf_page, page_index) for page_index in range(page_count)]
+        for future in as_completed(futures):
+            future.result()
+    return page_count
 
 
 def extract_book_images(book_path, output_dir):

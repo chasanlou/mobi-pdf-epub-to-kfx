@@ -101,6 +101,6 @@ dist\MobiKfxStudio\MobiKfxStudio.exe
 ## 注意
 
 - KCC 仍然需要通过 GUI 自动化操作，所以转换阶段可能会短暂切换窗口焦点。
-- PDF 会先渲染成图片，文件较大时提取时间会比较久。
+- PDF 会先渲染成图片，程序会使用 PyMuPDF 多进程提取。可通过环境变量 `MOBIKFX_PDF_WORKERS` 调整进程数，通过 `MOBIKFX_PDF_SCALE` 调整渲染倍率。
 - KFX 生成依赖 kckfxgen runtime，Python 版本不匹配会导致 `bad magic number` 一类错误。
 - KCC的输出路径需要自己修改为程序的cbz输出路径一致，否则会出错
