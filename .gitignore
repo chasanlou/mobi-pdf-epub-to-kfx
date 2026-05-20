@@ -1,0 +1,16 @@
+build/
+dist/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.spec
+
+_inspect_kcc/
+_inspect_kfxgen/
+转换日志.txt
+
+ui_settings.json
+*.log
+*.tmp
+*.old-*.kfx
