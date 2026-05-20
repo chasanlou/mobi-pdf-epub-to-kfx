@@ -45,20 +45,7 @@
 
 ## KCC 推荐设置
 
-推荐按下面的方向设置 KCC：
-
-- 设备选择 Kindle Paperwhite 12
-- 输出格式选择 CBZ
-- 勾选 Output Folder，并把输出路径设置为本程序的 CBZ 漫画放置点
-- 勾选 Right-to-left (manga)
-- 勾选 Stretch/Upscale
-- 勾选 Custom gamma
-- 勾选 Cropping mode
-- 勾选 Spread shift
-- 勾选 Smart Cover Crop
-- Gamma 设置为 1.40
-- Cropping Power 设置为 1.00
-- Preserve Margin % 设置为 0
+![KCC 推荐设置](assets/kcc-recommended-settings.png)
 
 ## 默认路径
 
